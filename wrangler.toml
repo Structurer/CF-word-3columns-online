@@ -4,5 +4,5 @@ compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "public"
 
 kv_namespaces = [
-  { binding = "VOCABULARY_KV", id = "78133d37f1734ec59068b9e2a3fdca84" }
+  { binding = "VOCABULARY_KV", id = "f61807d323a64c8f871f21b4f3840a34" }
 ]
