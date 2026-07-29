@@ -1,0 +1,15 @@
+{
+  "name": "words-pages",
+  "version": "1.0.0",
+  "description": "Word learning app on Cloudflare Pages (static assets + KV storage)",
+  "scripts": {
+    "login": "wrangler login",
+    "setup-kv": "node setup-kv.mjs",
+    "dev": "wrangler pages dev public --port 3000",
+    "deploy": "wrangler pages deploy public",
+    "kv:list": "wrangler kv namespace list"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
