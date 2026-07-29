@@ -1,32 +1,8 @@
-# =============================================================
-# Cloudflare Pages + KV 配置
-# 存储模式：Pages 静态文件（只读种子） +  KV 命名空间（读写持久化）
-# =============================================================
-
 name = "words-pages"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
-
-# 静态资源目录（Pages 发布目录）
 pages_build_output_dir = "public"
 
-# =============================================================
-#   KV 命名空间绑定（必填！否则 POST /api/words 会报错）
-# =============================================================
-# 全局绑定（适用于本地开发 + 预览环境）
 kv_namespaces = [
   { binding = "VOCABULARY_KV", id = "78133d37f1734ec59068b9e2a3fdca84" }
 ]
-
-# =============================================================
-#   环境特定配置（可选，用于覆盖全局绑定）
-# =============================================================
-[env.preview]
-# kv_namespaces = [
-#   { binding = "VOCABULARY_KV", preview_id = "78133d37f1734ec59068b9e2a3fdca84" }
-# ]
-
-[env.production]
-# kv_namespaces = [
-#   { binding = "VOCABULARY_KV", id = "78133d37f1734ec59068b9e2a3fdca84" }
-# ]
