@@ -26,100 +26,12 @@
 
 
 
-// ===== IndexedDB 本地缓存封装（应对 KV 未配置 / 网络离线场景） =====
-const DB_NAME = 'words_db';
-const DB_STORE = 'vocabulary';
-const DB_KEY = 'wordData_v1';
-
-let _dbPromise = null;
-function openDB() {
-    if (_dbPromise) return _dbPromise;
-    _dbPromise = new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = () => {
-            req.result.createObjectStore(DB_STORE);
-        };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-    });
-    return _dbPromise;
-}
-
-async function loadFromDB() {
-    try {
-        const db = await openDB();
-        return new Promise((resolve) => {
-            const tx = db.transaction(DB_STORE, 'readonly');
-            const req = tx.objectStore(DB_STORE).get(DB_KEY);
-            req.onsuccess = () => resolve(req.result || null);
-            req.onerror = () => resolve(null);
-        });
-    } catch (_) {
-        return null;
-    }
-}
-
-async function saveToDB(data) {
-    try {
-        const db = await openDB();
-        return new Promise((resolve, reject) => {
-            const tx = db.transaction(DB_STORE, 'readwrite');
-            tx.objectStore(DB_STORE).put({ ...data, _savedAt: Date.now() }, DB_KEY);
-            tx.oncomplete = () => resolve(true);
-            tx.onerror = () => reject(tx.error);
-        });
-    } catch (e) {
-        console.warn('IndexedDB save failed:', e);
-        return false;
-    }
-}
-
-// 当前存储模式：'kv' = 云端已连接; 'local' = 仅本地缓存
-let storageMode = 'kv';
-
-function setStorageMode(mode) {
-    storageMode = mode;
-    const el = document.getElementById('storageModeIndicator');
-    if (el) {
-        if (mode === 'kv') {
-            el.textContent = '☁️ 云端同步';
-            el.style.color = '#4CAF50';
-            el.title = '数据已连接 Cloudflare KV，实时同步';
-        } else {
-            el.textContent = '💾 本地缓存模式';
-            el.style.color = '#FF9800';
-            el.title = 'KV 未配置，数据保存在浏览器本地。配置 KV 后可恢复云端同步';
-        }
-    }
-}
-
-// ===== 页面加载后立即初始化 =====
+// 新增：页面加载后立即初始化（删除初始化界面后，无需等待点击“开始”）
 window.addEventListener('load', () => {
     initBaseEvents();
     initKeyboardEvents();
-    // 从云端拉取数据（IndexedDB 优先，云端回退）
+    // 从云端拉取数据
     fetchFromCloud();
-
-    // 网络恢复后自动尝试同步到云端
-    window.addEventListener('online', async () => {
-        if (storageMode === 'local' && isInited) {
-            showFeedback('🌐 网络已恢复，尝试连接云端...', 'info');
-            const data = { toReviewWords, masteredWords, untrainedWords, vocabularyName };
-            try {
-                const resp = await fetch('/api/words', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                if (resp.ok) {
-                    setStorageMode('kv');
-                    showFeedback('☁️ 已恢复云端同步！', 'success');
-                }
-            } catch (_) {
-                // 仍然失败，保持本地模式
-            }
-        }
-    });
 });
 
 // 关闭网页时的提示已移除，因为有自动保存功能
@@ -967,41 +879,9 @@ function validateInputWord() {
 }
 
 /**
- * 从服务器拉取数据（优先使用 IndexedDB 秒开，再后台拉云端覆盖）
+ * 新增模块：从服务器拉取数据
  */
 async function fetchFromCloud() {
-    // 1. 先尝试 IndexedDB 本地缓存，秒开
-    const cached = await loadFromDB();
-    if (cached && cached.toReviewWords && Array.isArray(cached.toReviewWords)) {
-        applyData(cached, true);
-        const cachedMode = cached._serverMode || 'local';
-        setStorageMode(cachedMode === 'kv' ? 'kv' : 'local');
-        showFeedback('💾 已从本地缓存加载', 'info');
-        // 本地缓存已有数据的话，仍然后台尝试拉一次云端做同步
-        try {
-            const resp = await fetch('/api/words', { method: 'GET' });
-            if (resp.ok) {
-                const cloudData = await resp.json();
-                if (cloudData && cloudData.toReviewWords) {
-                    applyData(cloudData, true);
-                    // 使用后端返回的 _storageMode 判定真实模式
-                    const mode = cloudData._storageMode === 'kv' ? 'kv' : 'local';
-                    setStorageMode(mode);
-                    await saveToDB({ ...cloudData, _serverMode: mode });
-                    if (mode === 'kv') {
-                        showFeedback('☁️ 已连接云端，数据已同步', 'success');
-                    } else {
-                        showFeedback('📖 已连接云端（种子模式）', 'info');
-                    }
-                }
-            }
-        } catch (_) {
-            // 云端拉取失败，保持本地模式
-        }
-        return;
-    }
-
-    // 2. 本地无缓存，尝试云端
     try {
         showFeedback('正在从服务器拉取数据...', 'info');
         const response = await fetch('/api/words');
@@ -1009,81 +889,42 @@ async function fetchFromCloud() {
             throw new Error('网络请求失败');
         }
         const data = await response.json();
-
+        
         if (data && (data.toReviewWords || data.masteredWords || data.untrainedWords)) {
-            applyData(data, true);
-            const mode = data._storageMode === 'kv' ? 'kv' : 'local';
-            setStorageMode(mode);
-            await saveToDB({ ...data, _serverMode: mode });
-            showFeedback(mode === 'kv' ? '✅ 数据拉取成功！' : '📖 已加载种子数据（KV 未配置）', mode === 'kv' ? 'success' : 'info');
+            // 加载服务器数据
+            toReviewWords = data.toReviewWords || [];
+            masteredWords = data.masteredWords || [];
+            untrainedWords = data.untrainedWords || [];
+            vocabularyName = data.vocabularyName || "服务器词汇表";
+            currentIndex = Math.min(currentIndex, toReviewWords.length - 1);
+            
+            // 更新UI
+            isInited = true;
+            document.getElementById('vocabularyNameDisplay').textContent = vocabularyName;
+            dom.importBtn.disabled = false;
+            dom.exportBtn.disabled = false;
+            dom.toggleMeaningBtn.disabled = false;
+            dom.shuffleBtn.disabled = false;
+            dom.saveBtn.disabled = false;
+            updateAllUI();
+            showFeedback('✅ 数据拉取成功！', 'success');
         } else {
-            showFeedback('⚠️ 服务器无数据，使用本地模式', 'info');
+            showFeedback('⚠️  服务器无数据，使用本地模式', 'info');
         }
     } catch (err) {
-        // 3. 云端也失败，尝试从 IndexedDB 救回
-        const dbData = await loadFromDB();
-        if (dbData && dbData.toReviewWords && Array.isArray(dbData.toReviewWords) && dbData.toReviewWords.length > 0) {
-            applyData(dbData, true);
-            setStorageMode('local');
-            showFeedback('⚠️ 云端无法访问，已回退到本地缓存', 'info');
-        } else {
-            showFeedback(`❌ 数据拉取失败：${err.message}`, 'error');
-        }
+        showFeedback(`❌ 数据拉取失败：${err.message}`, 'error');
     }
 }
 
 /**
- * 将数据应用到全局变量和 UI
- */
-function applyData(data, saveToCache) {
-    toReviewWords = data.toReviewWords || [];
-    masteredWords = data.masteredWords || [];
-    untrainedWords = data.untrainedWords || [];
-    vocabularyName = data.vocabularyName || "词汇表";
-    currentIndex = Math.min(currentIndex, Math.max(0, toReviewWords.length - 1));
-
-    isInited = true;
-    document.getElementById('vocabularyNameDisplay').textContent = vocabularyName;
-    if (dom.importBtn) dom.importBtn.disabled = false;
-    if (dom.exportBtn) dom.exportBtn.disabled = false;
-    if (dom.toggleMeaningBtn) dom.toggleMeaningBtn.disabled = false;
-    if (dom.shuffleBtn) dom.shuffleBtn.disabled = false;
-    if (dom.saveBtn) dom.saveBtn.disabled = false;
-    updateAllUI();
-
-    if (saveToCache) {
-        // 保存到 IndexedDB，同时记录后端返回的存储模式
-        const mode = data._storageMode === 'kv' ? 'kv' : 'local';
-        saveToDB({
-            toReviewWords, masteredWords, untrainedWords, vocabularyName,
-            _serverMode: mode
-        }).catch(() => {});
-    }
-}
-
-/**
- * 启动自动保存功能（每60秒自动保存一次）
- * 本地模式下只写 IndexedDB，不发云端请求
+ * 新增模块：启动自动保存功能
  */
 function startAutoSave() {
-    setInterval(async () => {
-        if (!isInited) return;
-        if (storageMode === 'kv') {
-            await uploadToCloud();
-        } else {
-            // 本地模式：直接存 IndexedDB
-            const data = {
-                toReviewWords,
-                masteredWords,
-                untrainedWords,
-                vocabularyName
-            };
-            const ok = await saveToDB(data);
-            if (ok) {
-                showFeedback('💾 已自动保存到本地缓存', 'info');
-            }
+    setInterval(() => {
+        if (isInited) {
+            uploadToCloud();
         }
-    }, 60000);
+    }, 60000); // 60秒自动保存一次
     showFeedback('✅ 自动保存功能已启动（每60秒自动保存一次）', 'info');
 }
 
@@ -1206,72 +1047,45 @@ function exportWords() {
 }
 
 /**
- * 上传数据到服务器（POST /api/words）
- * 若云端返回 503（KV 未配置）或网络错误，自动回退到 IndexedDB 本地保存
+ * 新增模块：上传数据到服务器
  */
 async function uploadToCloud() {
-    if (!isInited || (toReviewWords.length === 0 && masteredWords.length === 0 && untrainedWords.length === 0)) {
-        showFeedback('❌ 未加载有效数据，无法上传', 'error');
-        return;
-    }
-
-    const data = {
-        toReviewWords,
-        masteredWords,
-        untrainedWords,
-        vocabularyName
-    };
-
-    // 如果已经是本地模式，直接存 IndexedDB
-    if (storageMode === 'local') {
-        const ok = await saveToDB(data);
-        if (ok) {
-            showFeedback('💾 已保存到本地缓存（KV 未配置）', 'info');
-        } else {
-            showFeedback('❌ 本地保存失败', 'error');
-        }
-        return;
-    }
-
     try {
-        showFeedback('正在上传到服务器...', 'info');
-        const response = await fetch('/api/words', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-
-        if (response.status === 503) {
-            // KV 未配置，回退本地
-            setStorageMode('local');
-            const ok = await saveToDB(data);
-            if (ok) {
-                showFeedback('💾 KV 未配置，已自动保存到本地缓存', 'info');
-            } else {
-                showFeedback('❌ 本地保存失败', 'error');
-            }
+        // 双重判断，避免未加载数据时点击
+        if (!isInited || (toReviewWords.length === 0 && masteredWords.length === 0 && untrainedWords.length === 0)) {
+            showFeedback('❌ 未加载有效数据，无法上传到服务器', 'error');
             return;
         }
-
+        
+        showFeedback('正在上传到服务器...', 'info');
+        
+        const data = {
+            toReviewWords,
+            masteredWords,
+            untrainedWords,
+            vocabularyName
+        };
+        
+        const response = await fetch('/api/words', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
         if (!response.ok) {
-            throw new Error('上传失败 (HTTP ' + response.status + ')');
+            throw new Error('上传失败');
         }
-
+        
         const result = await response.json();
         if (result.success) {
             showFeedback('✅ 数据已成功上传到服务器！', 'success');
         } else {
-            throw new Error(result.error || '上传失败');
+            throw new Error('上传失败');
         }
     } catch (err) {
-        // 网络异常等其他错误：回退本地
-        setStorageMode('local');
-        const ok = await saveToDB(data);
-        if (ok) {
-            showFeedback('⚠️ 云端不可用，已自动保存到本地缓存', 'info');
-        } else {
-            showFeedback('❌ 上传失败且本地缓存也失败：' + err.message, 'error');
-        }
+        showFeedback(`❌ 服务器上传失败：${err.message}`, 'error');
     }
 }
 

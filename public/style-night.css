@@ -497,20 +497,6 @@ body {
   border-color: transparent;
 }
 
-/* 存储模式指示器 - 夜间模式 */
-.storage-mode-indicator {
-  position: absolute;
-  top: 0;
-  right: 220px;
-  height: 100%;
-  line-height: 34px;
-  font-size: 12px;
-  color: #888;
-  cursor: help;
-  user-select: none;
-  transition: color 0.3s ease;
-}
-
 /* 词汇表名称编辑输入框 - 夜间模式 */
 .vocabulary-name-input {
   position: absolute;

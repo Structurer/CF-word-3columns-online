@@ -160,16 +160,11 @@ async function writeData(context, data) {
 export async function onRequestGet(context) {
   try {
     console.log("GET /api/words");
-    const kv = getKv(context);
     let data = await readData(context);
     data = data ? normalizeData(data) : { ...DEFAULT_DATA };
-
-    // 标识数据来源：'kv' = 真正来自 KV；'seed' = 来自静态种子（KV 未配置时的回退）
-    const storageMode = kv ? "kv" : "seed";
-    data._storageMode = storageMode;
-
+    const kv = getKv(context);
     console.log(
-      "GET /api/words -> storage=" + storageMode +
+      "GET /api/words -> storage=" + (kv ? "KV" : "STATIC-ONLY(read-only)") +
       " toReviewWords=" + data.toReviewWords.length +
       " masteredWords=" + data.masteredWords.length +
       " untrainedWords=" + data.untrainedWords.length
