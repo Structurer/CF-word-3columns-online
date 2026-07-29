@@ -23,10 +23,10 @@ kv_namespaces = [
 # =============================================================
 [env.preview]
 # kv_namespaces = [
-#   { binding = "VOCABULARY_KV", preview_id = "YOUR_PREVIEW_KV_ID" }
+#   { binding = "VOCABULARY_KV", preview_id = "78133d37f1734ec59068b9e2a3fdca84" }
 # ]
 
 [env.production]
 # kv_namespaces = [
-#   { binding = "VOCABULARY_KV", id = "YOUR_PRODUCTION_KV_ID" }
+#   { binding = "VOCABULARY_KV", id = "78133d37f1734ec59068b9e2a3fdca84" }
 # ]
