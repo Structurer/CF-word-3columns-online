@@ -13,24 +13,20 @@ pages_build_output_dir = "public"
 # =============================================================
 #   KV 命名空间绑定（必填！否则 POST /api/words 会报错）
 # =============================================================
-# 绑定规则：
-#   - Variable name = VOCABULARY_KV   （Functions 中通过 context.env.VOCABULARY_KV 读取）
-#   - id = 生产 KV 命名空间 ID（wrangler kv namespace create 输出的 id）
-#   - preview_id = 本地/预览环境 KV ID（可与生产相同或分开）
-#
-# 快速启用步骤：
-#   1. npx wrangler login
-#   2. npx wrangler kv namespace create vocabulary-kv
-#   3. 用输出的 id 替换下面两处的 YOUR_KV_NAMESPACE_ID
-#   4. 或者直接运行  npm run setup-kv  自动创建 + 预灌初始词汇
-# =============================================================
-
-[env.preview]
+# 全局绑定（适用于本地开发 + 预览环境）
 kv_namespaces = [
-  # { binding = "VOCABULARY_KV", preview_id = "78133d37f1734ec59068b9e2a3fdca84" }
+  { binding = "VOCABULARY_KV", id = "78133d37f1734ec59068b9e2a3fdca84" }
 ]
+
+# =============================================================
+#   环境特定配置（可选，用于覆盖全局绑定）
+# =============================================================
+[env.preview]
+# kv_namespaces = [
+#   { binding = "VOCABULARY_KV", preview_id = "YOUR_PREVIEW_KV_ID" }
+# ]
 
 [env.production]
-kv_namespaces = [
-  # { binding = "VOCABULARY_KV", id = "78133d37f1734ec59068b9e2a3fdca84" }
-]
+# kv_namespaces = [
+#   { binding = "VOCABULARY_KV", id = "YOUR_PRODUCTION_KV_ID" }
+# ]

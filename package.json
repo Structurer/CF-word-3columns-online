@@ -5,7 +5,7 @@
   "scripts": {
     "login": "wrangler login",
     "setup-kv": "node setup-kv.mjs",
-    "dev": "wrangler pages dev public --port 3000",
+    "dev": "wrangler pages dev public --port 3000 --local",
     "deploy": "wrangler pages deploy public",
     "kv:list": "wrangler kv namespace list"
   },
